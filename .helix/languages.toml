@@ -1,0 +1,8 @@
+[language-server.local]
+command = "clangd"
+# args = ["--compile-commands-dir=."]
+
+[[language]]
+name="c"
+auto-format=true
+language-servers = [ "local" ]
