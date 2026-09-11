@@ -1,14 +1,19 @@
 #include "matrix.h"
+#include <math.h>
 
-Matrix *newMatrix(size_t rows, size_t cols) {
+size_t matrixSize(const Matrix *m) {
+  MatrixDim dim = m->dim;
+  return dim.x * dim.y * dim.z * dim.w;
+}
+
+Matrix *newMatrix(MatrixDim dim) {
   Matrix *m = malloc(sizeof(Matrix));
 
   if (m == NULL)
     return NULL;
 
-  m->rows = rows;
-  m->cols = cols;
-  m->data = malloc(sizeof(float) * rows * cols);
+  m->dim = dim;
+  m->data = malloc(sizeof(float) * matrixSize(m));
 
   if (m->data == NULL) {
     free(m);
@@ -23,23 +28,23 @@ void deleteMatrix(Matrix *m) {
   free(m);
 }
 
-size_t idxFromRowCol(const Matrix *m, size_t r, size_t c) {
-  return (r * m->cols) + c;
+size_t idxFromRowCol(const Matrix *m, Vec4 idx) {
+  return idx.x * m->dim.y + idx.y * m->dim.z + idx.z * m->dim.w + idx.w;
 }
 
-void setMatrixValue(Matrix *m, size_t r, size_t c, float val) {
-  m->data[idxFromRowCol(m, r, c)] = val;
+void setMatrixValue(Matrix *m, Vec4 idx, float val) {
+  m->data[idxFromRowCol(m, idx)] = val;
 }
 
-float getMatrixValue(const Matrix *m, size_t r, size_t c) {
-  return m->data[idxFromRowCol(m, r, c)];
+float getMatrixValue(const Matrix *m, Vec4 idx) {
+  return m->data[idxFromRowCol(m, idx)];
 }
 
 void initMatrix(Matrix *m, float vals[]) {
   if (!m || !vals)
     return;
 
-  size_t size = m->rows * m->cols;
+  size_t size = matrixSize(m);
 
   for (size_t i = 0; i < size; i++) {
     m->data[i] = vals[i];
@@ -53,26 +58,17 @@ void randomMatrix(Matrix *m, float min, float max) {
   float range = max - min;
   float div = range / RAND_MAX;
 
-  size_t size = m->rows * m->cols;
+  size_t size = matrixSize(m);
   for (size_t i = 0; i < size; i++) {
     m->data[i] = min + div * rand();
   }
 }
 
 void fillMatrix(Matrix *m, float fill) {
-  size_t size = m->rows * m->cols;
+  size_t size = matrixSize(m);
 
   for (size_t i = 0; i < size; i++) {
     m->data[i] = fill;
-  }
-}
-
-void identityMatrix(Matrix *m, float scale) {
-  fillMatrix(m, 0.0);
-  size_t l = (m->rows <= m->cols) ? m->rows : m->cols;
-
-  for (size_t i = 0; i < l; i++) {
-    setMatrixValue(m, i, i, scale);
   }
 }
 
@@ -82,13 +78,12 @@ bool matrixScale(const Matrix *m, float scale, Matrix *out) {
     return false;
   }
 
-  if (m->rows != out->rows || m->cols != out->cols) {
-    fprintf(stderr, "[FATAL] skipped matrixScale %lu x %lu vs %lu x %lu\n",
-            m->rows, m->cols, out->rows, out->cols);
+  if (matrixSize(m) != matrixSize(out)) {
+    fprintf(stderr, "[FATAL] skipped matrixScale mismatched size\n");
     return false;
   }
 
-  size_t size = m->rows * m->cols;
+  size_t size = matrixSize(m);
 
   for (size_t i = 0; i < size; i++) {
     float res = m->data[i] * scale;
@@ -97,37 +92,38 @@ bool matrixScale(const Matrix *m, float scale, Matrix *out) {
   return true;
 }
 
+// TODO: Specify the dimensions to multiply over and handle them dynamically
 bool matrixMul(const Matrix *a, const Matrix *b, Matrix *out) {
-  if (!a || !b || !out || a->cols != b->rows || out->rows != a->rows ||
-      out->cols != b->cols) {
-    fprintf(stderr, "[FATAL] skipped matrixMul\n");
-    return false;
-  }
+  // if (!a || !b || !out || a->cols != b->rows || out->rows != a->rows ||
+  //     out->cols != b->cols) {
+  //   fprintf(stderr, "[FATAL] skipped matrixMul\n");
+  //   return false;
+  // }
 
   fillMatrix(out, 0.0);
 
-  for (size_t r = 0; r < a->rows; r++) {
-    for (size_t c = 0; c < b->cols; c++) {
-      for (size_t k = 0; k < a->cols; k++) {
-        float val = getMatrixValue(a, r, k) * getMatrixValue(b, k, c) +
-                    getMatrixValue(out, r, c);
-        setMatrixValue(out, r, c, val);
-      }
-    }
-  }
+  // for (size_t r = 0; r < a->rows; r++) {
+  //   for (size_t c = 0; c < b->cols; c++) {
+  //     for (size_t k = 0; k < a->cols; k++) {
+  //       float val = getMatrixValue(a, r, k) * getMatrixValue(b, k, c) +
+  //                   getMatrixValue(out, r, c);
+  //       setMatrixValue(out, r, c, val);
+  //     }
+  //   }
+  // }
 
   return true;
 }
 
 bool matrixAdd(const Matrix *a, const Matrix *b, Matrix *out) {
-  if (!a || !b || !out || a->rows != b->rows || a->cols != b->cols ||
-      a->rows != out->rows || a->cols != out->cols) {
+  if (!a || !b || !out || matrixSize(a) != matrixSize(b) ||
+      matrixSize(a) != matrixSize(out)) {
     fprintf(stderr, "[FATAL] skipped matrixAdd\n");
     exit(1);
     return false;
   }
 
-  size_t size = a->rows * a->cols;
+  size_t size = matrixSize(a);
 
   for (size_t i = 0; i < size; i++) {
     float res = a->data[i] + b->data[i];
@@ -141,7 +137,7 @@ float matrixSum(const Matrix *in) {
   if (!in)
     return 0.0;
 
-  size_t size = in->rows * in->cols;
+  size_t size = matrixSize(in);
   float total = 0.0;
 
   for (size_t i = 0; i < size; i++) {
@@ -154,12 +150,31 @@ float matrixSum(const Matrix *in) {
 
 void displayMatrix(const char *title, const Matrix *m) {
   printf("%s:\n", title);
+  MatrixDim dim = m->dim;
 
-  for (size_t r = 0; r < m->rows; r++) {
-    for (size_t c = 0; c < m->cols; c++) {
-      printf("\t%-.2f ", getMatrixValue(m, r, c));
+  for (size_t l = 0; l < dim.x; l++) {
+    for (size_t i = 0; i < dim.y; i++) {
+      for (size_t j = 0; j < dim.z; j++) {
+        for (size_t k = 0; k < dim.w; k++) {
+          Vec4 idx = {
+              .x = l,
+              .y = i,
+              .z = j,
+              .w = k,
+          };
+          printf("\t%-.2f ", getMatrixValue(m, idx));
+        }
+
+        if (dim.w > 1)
+          putchar('\n');
+      }
+
+      if (dim.z > 1)
+        putchar('\n');
     }
-    putchar('\n');
+
+    if (dim.y > 1)
+      putchar('\n');
   }
   putchar('\n');
 }

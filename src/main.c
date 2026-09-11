@@ -11,50 +11,11 @@
   (((uint32_t)data[0] << 24) | ((uint32_t)data[1] << 16) |                     \
    ((uint32_t)data[2] << 8) | ((uint32_t)data[3] << 0))
 
-float sigmoid_func(float x) {
-  if (x >= 0.0)
-    return 1.0 / (1.0 + exp(-x));
-
-  float e = exp(x);
-  return e / (1.0 + e);
-}
-
-bool sigmoid(const Matrix *m, Matrix *out) {
-  if (!m || !out || m->rows != out->rows || m->cols != out->cols)
-    return false;
-
-  size_t size = m->rows * m->cols;
-  for (size_t i = 0; i < size; i++) {
-    out->data[i] = sigmoid_func(m->data[i]);
-  }
-
-  return true;
-}
-
-bool sigmoidDeriv(const Matrix *m, Matrix *out) {
-  size_t size = m->rows * m->cols;
-  for (size_t i = 0; i < size; i++) {
-    float s = m->data[i];
-    out->data[i] = s * (1.0 - s);
-  }
-  return true;
-}
-
-// float swish(float x) {
-//   return x * sigmoid_func(x);
-// }
-
-// float swishDeriv(float x) {
-//   float s = sigmoid_func(x);
-//   return s * (1.0 + x * (1.0 - s));
-// }
-
 float crossEntropy(const Matrix *target, const Matrix *prediction) {
-  if (!target || !prediction || target->rows != prediction->rows ||
-      target->cols != prediction->cols)
+  if (!target || !prediction || matrixSize(target) != matrixSize(prediction))
     return 0.0;
 
-  size_t size = target->rows * target->cols;
+  size_t size = matrixSize(target);
   float loss = 0.0;
 
   for (size_t i = 0; i < size; i++) {
@@ -68,12 +29,11 @@ float crossEntropy(const Matrix *target, const Matrix *prediction) {
 
 bool crossEntropyDeriv(const Matrix *target, const Matrix *prediction,
                        Matrix *out) {
-  if (!target || !prediction || target->rows != prediction->rows ||
-      target->cols != prediction->cols || target->rows != out->rows ||
-      target->cols != out->cols)
+  if (!target || !prediction || matrixSize(target) != matrixSize(prediction) ||
+      matrixSize(prediction) != matrixSize(out))
     return false;
 
-  size_t size = target->rows * target->cols;
+  size_t size = matrixSize(target);
 
   for (size_t i = 0; i < size; i++) {
     float y = target->data[i];
@@ -100,9 +60,9 @@ int demultiplexerNeuralNetwork() {
 
   srand(time(NULL));
 
-  Matrix *input = newMatrix(3, 1);
-  Matrix *target = newMatrix(8, 1);
-  Matrix *loss = newMatrix(8, 1);
+  Matrix *input = newMatrix((Vec4){.x = 3, .y = 1, .z = 1, .w = 1});
+  Matrix *target = newMatrix((Vec4){.x = 8, .y = 1, .z = 1, .w = 1});
+  Matrix *loss = newMatrix((Vec4){.x = 8, .y = 1, .z = 1, .w = 1});
 
   NNLinearLayer *linearLayer1 = newLinearLayer(3, 8);
   initLinearLayer(linearLayer1, -1.0, 1.0);
@@ -197,14 +157,7 @@ int demultiplexerNeuralNetwork() {
   return 0;
 }
 
-typedef struct Dimension {
-  int x;
-  int y;
-  int z;
-  int w;
-} Dimension;
-
-void initIDXFile(const char *path, FILE **f, Dimension *dim) {
+void initIDXFile(const char *path, FILE **f, MatrixDim *dim) {
   if ((*f = fopen(path, "rb")) == NULL) {
     fprintf(stderr, "[FATAL] Error opening file %s\n", path);
     exit(1);
@@ -225,7 +178,7 @@ void initIDXFile(const char *path, FILE **f, Dimension *dim) {
   }
 }
 
-size_t nextIDXValue(FILE *f, Dimension dim, uint8_t *out) {
+size_t nextIDXValue(FILE *f, MatrixDim dim, uint8_t *out) {
   size_t size = dim.y * dim.z * dim.w;
   size_t read = fread(out, sizeof(uint8_t), size, f);
   return size == read;
@@ -233,8 +186,8 @@ size_t nextIDXValue(FILE *f, Dimension dim, uint8_t *out) {
 
 int main(void) {
   FILE *images, *labels;
-  Dimension imgDim;
-  Dimension lblDim;
+  MatrixDim imgDim;
+  MatrixDim lblDim;
 
   initIDXFile("./TrainingData/train-images-idx3-ubyte.bin", &images, &imgDim);
   initIDXFile("./TrainingData/train-labels-idx1-ubyte.bin", &labels, &lblDim);
