@@ -110,7 +110,7 @@ bool matrixMul(const Matrix *a, const Matrix *b, Matrix *out) {
     for (size_t c = 0; c < b->cols; c++) {
       for (size_t k = 0; k < a->cols; k++) {
         float val = getMatrixValue(a, r, k) * getMatrixValue(b, k, c) +
-                     getMatrixValue(out, r, c);
+                    getMatrixValue(out, r, c);
         setMatrixValue(out, r, c, val);
       }
     }
@@ -157,7 +157,7 @@ void displayMatrix(const char *title, const Matrix *m) {
 
   for (size_t r = 0; r < m->rows; r++) {
     for (size_t c = 0; c < m->cols; c++) {
-      printf("\t%-7.2f ", getMatrixValue(m, r, c));
+      printf("\t%-.2f ", getMatrixValue(m, r, c));
     }
     putchar('\n');
   }

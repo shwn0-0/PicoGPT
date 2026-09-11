@@ -1,7 +1,15 @@
 #include "linear.h"
+#include "matrix.h"
 #include "softmax.h"
 #include <math.h>
+#include <stdint.h>
+#include <sys/syslimits.h>
 #include <time.h>
+#define EPS 1e-8
+
+#define byteswap(data)                                                         \
+  (((uint32_t)data[0] << 24) | ((uint32_t)data[1] << 16) |                     \
+   ((uint32_t)data[2] << 8) | ((uint32_t)data[3] << 0))
 
 float sigmoid_func(float x) {
   if (x >= 0.0)
@@ -77,19 +85,19 @@ bool crossEntropyDeriv(const Matrix *target, const Matrix *prediction,
   return true;
 }
 
-float sampleData[][3] = {
-    {0, 0, 0}, {0, 0, 1}, {0, 1, 0}, {0, 1, 1},
-    {1, 0, 0}, {1, 0, 1}, {1, 1, 0}, {1, 1, 1},
-};
+int demultiplexerNeuralNetwork() {
+  float sampleData[][3] = {
+      {0, 0, 0}, {0, 0, 1}, {0, 1, 0}, {0, 1, 1},
+      {1, 0, 0}, {1, 0, 1}, {1, 1, 0}, {1, 1, 1},
+  };
 
-float sampleTarget[][8] = {
-    {1, 0, 0, 0, 0, 0, 0, 0}, {0, 1, 0, 0, 0, 0, 0, 0},
-    {0, 0, 1, 0, 0, 0, 0, 0}, {0, 0, 0, 1, 0, 0, 0, 0},
-    {0, 0, 0, 0, 1, 0, 0, 0}, {0, 0, 0, 0, 0, 1, 0, 0},
-    {0, 0, 0, 0, 0, 0, 1, 0}, {0, 0, 0, 0, 0, 0, 0, 1},
-};
+  float sampleTarget[][8] = {
+      {1, 0, 0, 0, 0, 0, 0, 0}, {0, 1, 0, 0, 0, 0, 0, 0},
+      {0, 0, 1, 0, 0, 0, 0, 0}, {0, 0, 0, 1, 0, 0, 0, 0},
+      {0, 0, 0, 0, 1, 0, 0, 0}, {0, 0, 0, 0, 0, 1, 0, 0},
+      {0, 0, 0, 0, 0, 0, 1, 0}, {0, 0, 0, 0, 0, 0, 0, 1},
+  };
 
-int main(void) {
   srand(time(NULL));
 
   Matrix *input = newMatrix(3, 1);
@@ -109,7 +117,7 @@ int main(void) {
   NNActivationLayer *activLayer3 = newSoftmaxActivationLayer(8);
 
   for (size_t i = 0; i < 100000; i++) {
-    float loss_total = 0.0;
+    float lossTotal = 0.0;
 
     for (size_t k = 0; k < 8; k++) {
       initMatrix(input, sampleData[k]);
@@ -122,7 +130,7 @@ int main(void) {
       linearLayer3->forward(linearLayer3, activLayer2->output);
       activLayer3->forward(activLayer3, linearLayer3->output);
 
-      loss_total += crossEntropy(target, activLayer3->output);
+      lossTotal += crossEntropy(target, activLayer3->output);
 
       crossEntropyDeriv(target, activLayer3->output, loss);
 
@@ -137,7 +145,7 @@ int main(void) {
       linearLayer1->backward(linearLayer1, input, activLayer1->loss);
     }
 
-    float avg_loss = loss_total / 8.0f;
+    float avg_loss = lossTotal / 8.0f;
 
     if (avg_loss < 0.0001) {
       printf("Loss: %f\n", avg_loss);
@@ -186,5 +194,70 @@ int main(void) {
   deleteActivationLayer(activLayer1);
   deleteActivationLayer(activLayer2);
   deleteActivationLayer(activLayer3);
+  return 0;
+}
+
+typedef struct Dimension {
+  int x;
+  int y;
+  int z;
+  int w;
+} Dimension;
+
+void initIDXFile(const char *path, FILE **f, Dimension *dim) {
+  if ((*f = fopen(path, "rb")) == NULL) {
+    fprintf(stderr, "[FATAL] Error opening file %s\n", path);
+    exit(1);
+  }
+
+  uint8_t magicNumber[4];
+  fread(magicNumber, sizeof(int), 1, *f);
+  int numDims = magicNumber[3];
+
+  for (int i = 0; i < 4; i++) {
+    if (i < numDims) {
+      uint8_t data[4];
+      fread(data, sizeof(int), 1, *f);
+      ((int *)(dim))[i] = byteswap(data);
+    } else {
+      ((int *)(dim))[i] = 1;
+    }
+  }
+}
+
+size_t nextIDXValue(FILE *f, Dimension dim, uint8_t *out) {
+  size_t size = dim.y * dim.z * dim.w;
+  size_t read = fread(out, sizeof(uint8_t), size, f);
+  return size == read;
+}
+
+int main(void) {
+  FILE *images, *labels;
+  Dimension imgDim;
+  Dimension lblDim;
+
+  initIDXFile("./TrainingData/train-images-idx3-ubyte.bin", &images, &imgDim);
+  initIDXFile("./TrainingData/train-labels-idx1-ubyte.bin", &labels, &lblDim);
+
+  printf("Image Dim: %d x %d x %d\n", imgDim.x, imgDim.y, imgDim.z);
+  printf("Label Dim: %d\n\n", lblDim.x);
+
+  for (int k = 0; k < 5; k++) {
+    uint8_t imgData[28][28];
+    uint8_t label;
+    nextIDXValue(images, imgDim, (uint8_t *)imgData);
+    nextIDXValue(labels, lblDim, &label);
+
+    printf("\nSample Image: %d\n", label);
+    for (int i = 0; i < 28; i++) {
+      for (int j = 0; j < 28; j++) {
+        printf("%02x ", imgData[i][j]);
+      }
+      putchar('\n');
+    }
+  }
+
+  fclose(images);
+  fclose(labels);
   return 0;
 }
