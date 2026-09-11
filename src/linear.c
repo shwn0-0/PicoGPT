@@ -1,26 +1,4 @@
-#include "matrix.h"
-
-typedef struct NNLinearLayer NNLinearLayer;
-
-typedef void (*ForwardFunction)(NNLinearLayer *nnLayer, Matrix *input);
-typedef void (*BackwardFunction)(NNLinearLayer *nnLayer, Matrix *input,
-                                 Matrix *loss);
-typedef void (*OptimizeFunction)(NNLinearLayer *nnLayer, float trainingSteps,
-                                 float learningRate, float decay);
-
-struct NNLinearLayer {
-  size_t inputDim;
-  size_t outputDim;
-  Matrix *weights;
-  Matrix *weightsGrad;
-  Matrix *bias;
-  Matrix *biasGrad;
-  Matrix *output;
-  Matrix *loss;
-  ForwardFunction forward;
-  BackwardFunction backward;
-  OptimizeFunction optimize;
-};
+#include "linear.h"
 
 void nnLinearLayerForward(NNLinearLayer *layer, Matrix *input) {
   matrixMul(layer->weights, input, layer->output);
@@ -38,7 +16,7 @@ void nnLinearLayerBackward(NNLinearLayer *layer, Matrix *input, Matrix *loss) {
       if (res > MAXFLOAT) {
         res = MAXFLOAT;
       }
-      
+
       setMatrixValue(dzDW, r, c, res);
     }
   }
@@ -47,14 +25,14 @@ void nnLinearLayerBackward(NNLinearLayer *layer, Matrix *input, Matrix *loss) {
     float total = 0.0;
     float in = getMatrixValue(input, c, 0);
     for (size_t r = 0; r < layer->outputDim; r++) {
-      total +=
-          getMatrixValue(layer->weights, r, c) * getMatrixValue(loss, r, 0) * in;
+      total += getMatrixValue(layer->weights, r, c) *
+               getMatrixValue(loss, r, 0) * in;
     }
 
     if (total > MAXFLOAT) {
       total = MAXFLOAT;
     }
-    
+
     setMatrixValue(layer->loss, c, 0, total);
   }
 
@@ -65,22 +43,32 @@ void nnLinearLayerBackward(NNLinearLayer *layer, Matrix *input, Matrix *loss) {
 
 void nnLinearLayerOptimize(NNLinearLayer *layer, float steps, float lr,
                            float decay) {
-  float true_lr = lr / steps;
-  Matrix* dB = newMatrix(layer->outputDim, 1);
-  Matrix* dW = newMatrix(layer->outputDim, layer->inputDim);
+  float inv_steps = 1 / steps;
+  float decay_scale = 1.0 - decay;
 
-  matrixScale(layer->biasGrad, -true_lr, dB);
+  Matrix *dB = newMatrix(layer->outputDim, 1);
+  Matrix *dW = newMatrix(layer->outputDim, layer->inputDim);
+
+  fillMatrix(dB, 0.0f);
+  matrixScale(layer->biasGrad, inv_steps, dB);
+  matrixAdd(layer->prevBiasGrad, dB, dB);
+  matrixScale(dB, decay_scale, layer->prevBiasGrad);
+
+  matrixScale(dB, -lr, dB);
   matrixAdd(layer->bias, dB, layer->bias);
-  matrixScale(layer->weightsGrad, -true_lr, dW);
+
+  fillMatrix(dW, 0.0f);
+  matrixScale(layer->weightsGrad, inv_steps, dW);
+  matrixAdd(layer->prevWeightsGrad, dW, dW);
+  matrixScale(dW, decay_scale, layer->prevWeightsGrad);
+
+  matrixScale(dW, -lr, dW);
   matrixAdd(layer->weights, dW, layer->weights);
 
+  fillMatrix(layer->weightsGrad, 0.0);
+  fillMatrix(layer->biasGrad, 0.0);
   deleteMatrix(dB);
   deleteMatrix(dW);
-
-
-  float scale = 1.0 - decay;
-  matrixScale(layer->weightsGrad, scale, layer->weightsGrad);
-  matrixScale(layer->biasGrad, scale, layer->biasGrad);
 }
 
 NNLinearLayer *newLinearLayer(size_t inputDim, size_t outputDim) {
@@ -94,8 +82,10 @@ NNLinearLayer *newLinearLayer(size_t inputDim, size_t outputDim) {
       .outputDim = outputDim,
       .weights = newMatrix(outputDim, inputDim),
       .weightsGrad = newMatrix(outputDim, inputDim),
+      .prevWeightsGrad = newMatrix(outputDim, inputDim),
       .bias = newMatrix(outputDim, 1),
       .biasGrad = newMatrix(outputDim, 1),
+      .prevBiasGrad = newMatrix(outputDim, 1),
       .output = newMatrix(outputDim, 1),
       .loss = newMatrix(inputDim, 1),
       .forward = nnLinearLayerForward,
@@ -112,9 +102,12 @@ NNLinearLayer *newLinearLayer(size_t inputDim, size_t outputDim) {
 void destroyLinearLayer(NNLinearLayer *layer) {
   deleteMatrix(layer->weights);
   deleteMatrix(layer->weightsGrad);
+  deleteMatrix(layer->prevWeightsGrad);
   deleteMatrix(layer->bias);
   deleteMatrix(layer->biasGrad);
+  deleteMatrix(layer->prevBiasGrad);
   deleteMatrix(layer->output);
+  deleteMatrix(layer->loss);
   free(layer);
 }
 

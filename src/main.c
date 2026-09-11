@@ -1,5 +1,5 @@
-#include "linear.c"
-#include "softmax.c"
+#include "linear.h"
+#include "softmax.h"
 #include <math.h>
 #include <time.h>
 

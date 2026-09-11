@@ -1,14 +1,20 @@
-TARGET:=bin/nn
-OBJS:=src/main.o src/matrix.o
-CFLAGS:=-Wall -Iinclude
+BIN:=bin
+LIB:=lib
+INC:=include
+SRC:=src
+CFLAGS=-std=c17 -Wall -I$(INC)
+
+SRC_FILES:=$(wildcard $(SRC)/*.c)
+OBJ_PATHS=$(patsubst src/%.c, $(LIB)/%.o, $(SRC_FILES))
+TARGET=$(BIN)/nn
 
 all: $(TARGET)
 
-$(TARGET): $(OBJS)
+$(TARGET): $(OBJ_PATHS)
 	$(CC) $(CFLAGS) $^ -o $@
 
-%.o: %.c
+$(LIB)/%.o: $(SRC)/%.c 
 	$(CC) $(CFLAGS) -c -o $@ $< 
 
 clean:
-	rm -f $(OBJS)
+	rm -f $(OBJ_PATHS)
