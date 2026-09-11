@@ -29,7 +29,10 @@ void deleteMatrix(Matrix *m) {
 }
 
 size_t idxFromRowCol(const Matrix *m, Vec4 idx) {
-  return idx.x * m->dim.y + idx.y * m->dim.z + idx.z * m->dim.w + idx.w;
+  size_t c = m->dim.w;
+  size_t b = c * m->dim.z;
+  size_t a = b * m->dim.y;
+  return a * idx.x + b * idx.y + c * idx.z + idx.w;
 }
 
 void setMatrixValue(Matrix *m, Vec4 idx, float val) {
@@ -74,12 +77,12 @@ void fillMatrix(Matrix *m, float fill) {
 
 bool matrixScale(const Matrix *m, float scale, Matrix *out) {
   if (!m || !out) {
-    fprintf(stderr, "[FATAL] skipped matrixScale [m=%p] [out=%p]\n", m, out);
+    fprintf(stderr, "[ERROR] skipped matrixScale [m=%p] [out=%p]\n", m, out);
     return false;
   }
 
   if (matrixSize(m) != matrixSize(out)) {
-    fprintf(stderr, "[FATAL] skipped matrixScale mismatched size\n");
+    fprintf(stderr, "[ERROR] skipped matrixScale: mismatched size\n");
     return false;
   }
 
@@ -92,25 +95,39 @@ bool matrixScale(const Matrix *m, float scale, Matrix *out) {
   return true;
 }
 
-// TODO: Specify the dimensions to multiply over and handle them dynamically
 bool matrixMul(const Matrix *a, const Matrix *b, Matrix *out) {
-  // if (!a || !b || !out || a->cols != b->rows || out->rows != a->rows ||
-  //     out->cols != b->cols) {
-  //   fprintf(stderr, "[FATAL] skipped matrixMul\n");
-  //   return false;
-  // }
+  if (!a || !b || !out) {
+    fprintf(stderr, "[ERROR] skipped matrixMul: [a=%p] [b=%p] [out=%p]\n", a, b,
+            out);
+    return false;
+  }
+
+  if (a->dim.w != b->dim.x && a->dim.z == b->dim.y) {
+    fprintf(stderr, "[ERROR] skipped matrixMul: dimension mismatch\n");
+    return false;
+  }
 
   fillMatrix(out, 0.0);
 
-  // for (size_t r = 0; r < a->rows; r++) {
-  //   for (size_t c = 0; c < b->cols; c++) {
-  //     for (size_t k = 0; k < a->cols; k++) {
-  //       float val = getMatrixValue(a, r, k) * getMatrixValue(b, k, c) +
-  //                   getMatrixValue(out, r, c);
-  //       setMatrixValue(out, r, c, val);
-  //     }
-  //   }
-  // }
+  for (size_t i = 0; i < a->dim.x; i++) {
+    for (size_t j = 0; j < a->dim.y; j++) {
+      for (size_t k = 0; k < b->dim.z; k++) {
+        for (size_t l = 0; l < b->dim.w; l++) {
+          Vec4 currIdx = {i, j, k, l};
+
+          for (size_t r = 0; r < a->dim.z; r++) {
+            for (size_t c = 0; c < a->dim.w; c++) {
+              Vec4 idxA = (Vec4){i, j, r, c};
+              Vec4 idxB = (Vec4){c, r, k, l};
+              float val = getMatrixValue(a, idxA) * getMatrixValue(b, idxB) +
+                          getMatrixValue(out, currIdx);
+              setMatrixValue(out, currIdx, val);
+            }
+          }
+        }
+      }
+    }
+  }
 
   return true;
 }
@@ -118,7 +135,7 @@ bool matrixMul(const Matrix *a, const Matrix *b, Matrix *out) {
 bool matrixAdd(const Matrix *a, const Matrix *b, Matrix *out) {
   if (!a || !b || !out || matrixSize(a) != matrixSize(b) ||
       matrixSize(a) != matrixSize(out)) {
-    fprintf(stderr, "[FATAL] skipped matrixAdd\n");
+    fprintf(stderr, "[ERROR] skipped matrixAdd\n");
     exit(1);
     return false;
   }
@@ -162,17 +179,14 @@ void displayMatrix(const char *title, const Matrix *m) {
               .z = j,
               .w = k,
           };
-          printf("\t%-.2f ", getMatrixValue(m, idx));
+          printf("%8.2f ", getMatrixValue(m, idx));
         }
-
         if (dim.w > 1)
           putchar('\n');
       }
-
       if (dim.z > 1)
         putchar('\n');
     }
-
     if (dim.y > 1)
       putchar('\n');
   }

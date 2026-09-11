@@ -45,7 +45,7 @@ bool crossEntropyDeriv(const Matrix *target, const Matrix *prediction,
   return true;
 }
 
-int demultiplexerNeuralNetwork() {
+int nnDemultiplexer() {
   float sampleData[][3] = {
       {0, 0, 0}, {0, 0, 1}, {0, 1, 0}, {0, 1, 1},
       {1, 0, 0}, {1, 0, 1}, {1, 1, 0}, {1, 1, 1},
@@ -60,21 +60,25 @@ int demultiplexerNeuralNetwork() {
 
   srand(time(NULL));
 
-  Matrix *input = newMatrix((Vec4){.x = 3, .y = 1, .z = 1, .w = 1});
-  Matrix *target = newMatrix((Vec4){.x = 8, .y = 1, .z = 1, .w = 1});
-  Matrix *loss = newMatrix((Vec4){.x = 8, .y = 1, .z = 1, .w = 1});
+  Matrix *input = newMatrix((Vec4){.x = 1, .y = 1, .z = 1, .w = 3});
+  Matrix *target = newMatrix((Vec4){.x = 1, .y = 1, .z = 1, .w = 8});
+  Matrix *loss = newMatrix((Vec4){.x = 1, .y = 1, .z = 1, .w = 8});
 
-  NNLinearLayer *linearLayer1 = newLinearLayer(3, 8);
+  if (!input || !target || !loss) {
+    return -1;
+  }
+
+  NNLinearLayer *linearLayer1 = newLinearLayer(3, 1, 8);
   initLinearLayer(linearLayer1, -1.0, 1.0);
-  NNActivationLayer *activLayer1 = newSoftmaxActivationLayer(8);
+  NNActivationLayer *activLayer1 = newSoftmaxActivationLayer(8, 1);
 
-  NNLinearLayer *linearLayer2 = newLinearLayer(8, 8);
+  NNLinearLayer *linearLayer2 = newLinearLayer(8, 1, 8);
   initLinearLayer(linearLayer2, -1.0, 1.0);
-  NNActivationLayer *activLayer2 = newSoftmaxActivationLayer(8);
+  NNActivationLayer *activLayer2 = newSoftmaxActivationLayer(8, 1);
 
-  NNLinearLayer *linearLayer3 = newLinearLayer(8, 8);
+  NNLinearLayer *linearLayer3 = newLinearLayer(8, 1, 8);
   initLinearLayer(linearLayer3, -1.0, 1.0);
-  NNActivationLayer *activLayer3 = newSoftmaxActivationLayer(8);
+  NNActivationLayer *activLayer3 = newSoftmaxActivationLayer(8, 1);
 
   for (size_t i = 0; i < 100000; i++) {
     float lossTotal = 0.0;
@@ -184,7 +188,7 @@ size_t nextIDXValue(FILE *f, MatrixDim dim, uint8_t *out) {
   return size == read;
 }
 
-int main(void) {
+int nnMNISTImageClassifier() {
   FILE *images, *labels;
   MatrixDim imgDim;
   MatrixDim lblDim;
@@ -192,8 +196,8 @@ int main(void) {
   initIDXFile("./TrainingData/train-images-idx3-ubyte.bin", &images, &imgDim);
   initIDXFile("./TrainingData/train-labels-idx1-ubyte.bin", &labels, &lblDim);
 
-  printf("Image Dim: %d x %d x %d\n", imgDim.x, imgDim.y, imgDim.z);
-  printf("Label Dim: %d\n\n", lblDim.x);
+  printf("Image Dim: %lu x %lu x %lu\n", imgDim.x, imgDim.y, imgDim.z);
+  printf("Label Dim: %lu\n\n", lblDim.x);
 
   for (int k = 0; k < 5; k++) {
     uint8_t imgData[28][28];
@@ -212,5 +216,10 @@ int main(void) {
 
   fclose(images);
   fclose(labels);
+  return 0;
+}
+
+int main(void) {
+  nnDemultiplexer();
   return 0;
 }

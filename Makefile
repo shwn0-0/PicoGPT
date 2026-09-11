@@ -2,7 +2,7 @@ BIN:=bin
 LIB:=lib
 INC:=include
 SRC:=src
-CFLAGS=-std=c17 -Wall -I$(INC)
+CFLAGS=-std=c17 -g -Wall -I$(INC)
 
 SRC_FILES:=$(wildcard $(SRC)/*.c)
 OBJ_PATHS=$(patsubst src/%.c, $(LIB)/%.o, $(SRC_FILES))

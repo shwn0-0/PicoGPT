@@ -5,8 +5,6 @@
 
 
 typedef struct NNLinearLayer {
-  size_t inputDim;
-  size_t outputDim;
   Matrix *weights;
   Matrix *weightsGrad;
   Matrix *prevWeightsGrad;
@@ -21,7 +19,7 @@ typedef struct NNLinearLayer {
                                  float learningRate, float decay);
 } NNLinearLayer;
 
-NNLinearLayer *newLinearLayer(size_t inputDim, size_t outputDim);
+NNLinearLayer *newLinearLayer(int inputDim, int embeddingDim, int outputDim);
 void initLinearLayer(NNLinearLayer *nnLayer, float min, float max);
 void destroyLinearLayer(NNLinearLayer *layer);
 #endif

@@ -1,8 +1,15 @@
 #include "softmax.h"
+#include <math.h>
 #define EPS 1e-8
 
 void softmax(NNActivationLayer *layer, const Matrix *in) {
-  size_t size = in->rows * in->cols;
+  if (matrixSize(in) != matrixSize(layer->output)) {
+    printf("%lu, %lu, %lu, %lu", in->dim.x, in->dim.y, in->dim.z, in->dim.w);
+    fprintf(stderr, "[ERROR] dimension mismatch when performing softmax\n");
+    exit(1);
+  }
+
+  size_t size = matrixSize(in);
   float total = 0.0;
 
   for (size_t i = 0; i < size; i++) {
@@ -24,7 +31,13 @@ void softmax(NNActivationLayer *layer, const Matrix *in) {
 
 void softmaxDeriv(NNActivationLayer *layer, const Matrix *in,
                   const Matrix *loss) {
-  size_t size = in->rows * in->cols;
+  if (matrixSize(in) != matrixSize(layer->loss)) {
+    printf("%lu, %lu, %lu, %lu", in->dim.x, in->dim.y, in->dim.z, in->dim.w);
+    fprintf(stderr, "[ERROR] dimension mismatch when performing softmax\n");
+    exit(1);
+  }
+
+  size_t size = matrixSize(in);
   for (size_t i = 0; i < size; i++) {
     layer->loss->data[i] = 0.0f;
 
@@ -37,13 +50,15 @@ void softmaxDeriv(NNActivationLayer *layer, const Matrix *in,
   }
 }
 
-NNActivationLayer *newSoftmaxActivationLayer(size_t dim) {
+NNActivationLayer *newSoftmaxActivationLayer(size_t inputDim,
+                                             size_t embeddingDim) {
+  MatrixDim dim = {1, 1, embeddingDim, inputDim};
   NNActivationLayer *layer = malloc(sizeof(NNActivationLayer));
   *layer = (NNActivationLayer){
       .forward = softmax,
       .backward = softmaxDeriv,
-      .output = newMatrix(dim, 1),
-      .loss = newMatrix(dim, 1),
+      .output = newMatrix(dim),
+      .loss = newMatrix(dim),
   };
   return layer;
 }

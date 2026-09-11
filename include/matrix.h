@@ -4,11 +4,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct Vec4 {
-  int x;
-  int y;
-  int z;
-  int w;
+typedef struct Vec3 {
+  size_t x;
+  size_t y;
+  size_t z;
+  size_t w;
 } MatrixDim, Vec4;
 
 typedef struct Matrix {
