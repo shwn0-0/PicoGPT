@@ -10,6 +10,9 @@ TARGET=$(BIN)/nn
 
 all: $(TARGET)
 
+install:
+	tar -xzf TrainingData/data.tar.gz -C TrainingData/
+
 $(TARGET): $(OBJ_PATHS)
 	$(CC) $(CFLAGS) $^ -o $@
 
@@ -17,4 +20,4 @@ $(LIB)/%.o: $(SRC)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $< 
 
 clean:
-	rm -f $(OBJ_PATHS)
+	rm -f $(OBJ_PATHS) TrainingData/*.bin
