@@ -20,5 +20,5 @@ typedef struct NNLinearLayer {
 
 NNLinearLayer *newLinearLayer(Vec2 inputDim, Vec2 outputDim);
 void initLinearLayer(NNLinearLayer *nnLayer, float min, float max);
-void destroyLinearLayer(NNLinearLayer *layer);
+void deleteLinearLayer(NNLinearLayer *layer);
 #endif

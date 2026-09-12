@@ -36,22 +36,42 @@ size_t idxFromRowCol(const Matrix *m, Vec4 idx) {
 }
 
 void setMatrixValue(Matrix *m, Vec4 idx, float val) {
-  m->data[idxFromRowCol(m, idx)] = val;
+  size_t i = idxFromRowCol(m, idx);
+  if (i >= matrixSize(m)) {
+    fprintf(stderr, "[ERROR] out of bounds access\n");
+    exit(1);
+  }
+  m->data[i] = val;
 }
 
 float getMatrixValue(const Matrix *m, Vec4 idx) {
-  return m->data[idxFromRowCol(m, idx)];
+  size_t i = idxFromRowCol(m, idx);
+  if (i >= matrixSize(m)) {
+    fprintf(stderr, "[ERROR] out of bounds access\n");
+    exit(1);
+  }
+  return m->data[i];
 }
 
-void initMatrix(Matrix *m, float vals[]) {
+bool initMatrix(Matrix *m, float vals[]) {
   if (!m || !vals)
-    return;
-
+    return false;
   size_t size = matrixSize(m);
-
   for (size_t i = 0; i < size; i++) {
     m->data[i] = vals[i];
   }
+  return true;
+}
+
+bool initMatrix_uint8(const Matrix *m, uint8_t vals[]) {
+  if (!m || !vals) {
+    return false;
+  }
+  size_t size = matrixSize(m);
+  for (size_t i = 0; i < size; i++) {
+    m->data[i] = vals[i];
+  }
+  return true;
 }
 
 void randomMatrix(Matrix *m, float min, float max) {
@@ -166,6 +186,10 @@ float matrixSum(const Matrix *in) {
 }
 
 void displayMatrix(const char *title, const Matrix *m) {
+  displayMatrixf(title, "%8.2f ", m);
+}
+
+void displayMatrixf(const char *title, const char *fmt, const Matrix *m) {
   printf("%s:\n", title);
   Vec4 dim = m->dim;
 
@@ -179,7 +203,7 @@ void displayMatrix(const char *title, const Matrix *m) {
               .z = j,
               .w = k,
           };
-          printf("%8.2f ", getMatrixValue(m, idx));
+          printf(fmt, getMatrixValue(m, idx));
         }
         if (dim.w > 1)
           putchar('\n');

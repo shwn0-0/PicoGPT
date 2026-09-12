@@ -4,35 +4,68 @@
 
 void softmax(NNActivationLayer *layer, const Matrix *in) {
   if (matrixSize(in) != matrixSize(layer->output)) {
-    printf("%lu, %lu, %lu, %lu", in->dim.x, in->dim.y, in->dim.z, in->dim.w);
     fprintf(stderr, "[ERROR] dimension mismatch when performing softmax\n");
     exit(1);
   }
 
-  size_t size = matrixSize(in);
-  float total = 0.0;
+  Matrix *total = newMatrix((Vec4){1, in->dim.x, in->dim.y, in->dim.z});
+  Matrix *max = newMatrix((Vec4){1, in->dim.x, in->dim.y, in->dim.z});
 
-  for (size_t i = 0; i < size; i++) {
-    float e = exp(in->data[i]);
+  for (size_t a = 0; a < in->dim.x; a++)
+    for (size_t b = 0; b < in->dim.y; b++)
+      for (size_t i = 0; i < in->dim.z; i++) {
+        float rowMax = 0.0f;
 
-    if (e == INFINITY)
-      e = MAXFLOAT;
+        for (size_t j = 0; j < in->dim.w; j++) {
+          float val = getMatrixValue(in, (Vec4){a, b, i, j});
 
-    layer->output->data[i] = e;
-    total += e;
-  }
+          if (val > rowMax) {
+            rowMax = val;
+          }
+        }
 
-  float total_inv = 1 / (total + EPS);
+        setMatrixValue(max, (Vec4){0, a, b, i}, rowMax);
+      }
 
-  for (size_t i = 0; i < size; i++) {
-    layer->output->data[i] *= total_inv;
-  }
+  for (size_t a = 0; a < in->dim.x; a++)
+    for (size_t b = 0; b < in->dim.y; b++)
+      for (size_t i = 0; i < in->dim.z; i++) {
+        float rowTotal = 0.0f;
+        float rowMax = getMatrixValue(max, (Vec4){0, a, b, i});
+
+        for (size_t j = 0; j < in->dim.w; j++) {
+          float val = getMatrixValue(in, (Vec4){a, b, i, j});
+          float e = exp(val - rowMax);
+
+          if (e >= INFINITY)
+            e = MAXFLOAT;
+
+          setMatrixValue(layer->output, (Vec4){a, b, i, j}, e);
+          rowTotal += e;
+        }
+
+        setMatrixValue(total, (Vec4){0, a, b, i}, rowTotal);
+      }
+
+  for (size_t a = 0; a < in->dim.x; a++)
+    for (size_t b = 0; b < in->dim.y; b++)
+      for (size_t i = 0; i < in->dim.z; i++) {
+        float rowTotal = getMatrixValue(total, (Vec4){0, a, b, i});
+        float totalInv = 1 / (rowTotal + EPS);
+
+        for (size_t j = 0; j < in->dim.w; j++) {
+          float val = getMatrixValue(layer->output, (Vec4){a, b, i, j});
+          setMatrixValue(layer->output, (Vec4){a, b, i, j}, val * totalInv);
+        }
+      }
+
+  deleteMatrix(total);
+  deleteMatrix(max);
 }
 
 void softmaxDeriv(NNActivationLayer *layer, const Matrix *in,
                   const Matrix *loss) {
   if (matrixSize(in) != matrixSize(layer->loss)) {
-    printf("%lu, %lu, %lu, %lu", in->dim.x, in->dim.y, in->dim.z, in->dim.w);
     fprintf(stderr, "[ERROR] dimension mismatch when performing softmax\n");
     exit(1);
   }

@@ -109,7 +109,7 @@ NNLinearLayer *newLinearLayer(Vec2 inputDim, Vec2 outputDim) {
   return layer;
 }
 
-void destroyLinearLayer(NNLinearLayer *layer) {
+void deleteLinearLayer(NNLinearLayer *layer) {
   deleteMatrix(layer->weights);
   deleteMatrix(layer->weightsGrad);
   deleteMatrix(layer->prevWeightsGrad);

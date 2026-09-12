@@ -27,11 +27,13 @@ void deleteMatrix(Matrix *m);
 void setMatrixValue(Matrix *m, Vec4 idx, float val);
 float getMatrixValue(const Matrix *m, Vec4);
 
-void initMatrix(Matrix *m, float vals[]);
+bool initMatrix(Matrix *m, float vals[]);
+bool initMatrix_uint8(const Matrix *m, uint8_t vals[]);
 void randomMatrix(Matrix *m, float min, float max);
 void fillMatrix(Matrix *m, float fill);
 
 void displayMatrix(const char *title, const Matrix *m);
+void displayMatrixf(const char *title, const char* fmt, const Matrix *m);
 
 size_t matrixSize(const Matrix *m);
 float matrixSum(const Matrix *in);

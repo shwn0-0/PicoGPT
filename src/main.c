@@ -1,11 +1,13 @@
 #include "linear.h"
 #include "matrix.h"
+#include "rmsnorm.h"
 #include "softmax.h"
 #include <math.h>
 #include <stdint.h>
 #include <sys/syslimits.h>
 #include <time.h>
 #define EPS 1e-8
+#define BATCHSIZE 20
 
 #define byteswap(data)                                                         \
   (((uint32_t)data[0] << 24) | ((uint32_t)data[1] << 16) |                     \
@@ -153,18 +155,18 @@ int nnDemultiplexer() {
   deleteMatrix(input);
   deleteMatrix(target);
   deleteMatrix(loss);
-  destroyLinearLayer(linearLayer1);
-  // destroyLinearLayer(linearLayer2);
-  // destroyLinearLayer(linearLayer3);
+  deleteLinearLayer(linearLayer1);
+  deleteLinearLayer(linearLayer2);
+  deleteLinearLayer(linearLayer3);
   deleteActivationLayer(activLayer1);
-  // deleteActivationLayer(activLayer2);
-  // deleteActivationLayer(activLayer3);
+  deleteActivationLayer(activLayer2);
+  deleteActivationLayer(activLayer3);
   return 0;
 }
 
 void initIDXFile(const char *path, FILE **f, Vec4 *dim) {
   if ((*f = fopen(path, "rb")) == NULL) {
-    fprintf(stderr, "[FATAL] Error opening file %s\n", path);
+    fprintf(stderr, "[ERROR] Error opening file %s\n", path);
     exit(1);
   }
 
@@ -176,17 +178,36 @@ void initIDXFile(const char *path, FILE **f, Vec4 *dim) {
     if (i < numDims) {
       uint8_t data[4];
       fread(data, sizeof(int), 1, *f);
-      ((int *)(dim))[i] = byteswap(data);
+      ((size_t *)(dim))[i] = byteswap(data);
     } else {
-      ((int *)(dim))[i] = 1;
+      ((size_t *)(dim))[i] = 1;
     }
   }
 }
 
 size_t nextIDXValue(FILE *f, Vec4 dim, uint8_t *out) {
-  size_t size = dim.y * dim.z * dim.w;
+  size_t size = dim.x * dim.y * dim.z * dim.w;
   size_t read = fread(out, sizeof(uint8_t), size, f);
   return size == read;
+}
+
+bool loadNextImage(FILE *images, FILE *labels, Matrix *img, Matrix *label) {
+  uint8_t buffer[BUFSIZ];
+  if (!nextIDXValue(images, img->dim, buffer)) {
+    fprintf(stderr, "[ERROR] failed to load image\n");
+    return false;
+  }
+
+  initMatrix_uint8(img, buffer);
+
+  if (!nextIDXValue(labels, (Vec4){1, 1, 1, 1}, buffer)) {
+    fprintf(stderr, "[ERROR] failed to load label\n");
+    return false;
+  }
+
+  fillMatrix(label, 0.0f);
+  setMatrixValue(label, (Vec4){0, 0, 0, buffer[0]}, 1.0f);
+  return true;
 }
 
 int nnMNISTImageClassifier() {
@@ -197,30 +218,111 @@ int nnMNISTImageClassifier() {
   initIDXFile("./TrainingData/train-images-idx3-ubyte.bin", &images, &imgDim);
   initIDXFile("./TrainingData/train-labels-idx1-ubyte.bin", &labels, &lblDim);
 
-  printf("Image Dim: %lu x %lu x %lu\n", imgDim.x, imgDim.y, imgDim.z);
-  printf("Label Dim: %lu\n\n", lblDim.x);
+  Matrix *img = newMatrix((Vec4){1, 1, imgDim.y, imgDim.z});
+  Matrix *target = newMatrix((Vec4){1, 1, 1, 10});
+  Matrix *loss = newMatrix((Vec4){1, 1, 1, 10});
 
-  for (int k = 0; k < 5; k++) {
-    uint8_t imgData[28][28];
-    uint8_t label;
-    nextIDXValue(images, imgDim, (uint8_t *)imgData);
-    nextIDXValue(labels, lblDim, &label);
+  NNLinearLayer *layer1 = newLinearLayer((Vec2){28, 28}, (Vec2){1, 32});
+  initLinearLayer(layer1, -1.0f, 1.0f);
+  NNActivationLayer *rms1 = newRMSNormLayer((Vec2){1, 32});
 
-    printf("\nSample Image: %d\n", label);
-    for (int i = 0; i < 28; i++) {
-      for (int j = 0; j < 28; j++) {
-        printf("%02x ", imgData[i][j]);
+  NNLinearLayer *layer2 = newLinearLayer((Vec2){1, 32}, (Vec2){1, 32});
+  initLinearLayer(layer2, -1.0f, 1.0f);
+  NNActivationLayer *rms2 = newRMSNormLayer((Vec2){1, 32});
+
+  NNLinearLayer *layer3 = newLinearLayer((Vec2){1, 32}, (Vec2){1, 10});
+  initLinearLayer(layer3, -1.0f, 1.0f);
+  NNActivationLayer *softmax = newSoftmaxActivationLayer((Vec2){1, 10});
+
+  int outerLoop = imgDim.x / BATCHSIZE;
+
+  for (int i = 0; i < outerLoop; i++) {
+    float totalLoss = 0.0f;
+
+    for (int j = 0; j < BATCHSIZE; j++) {
+      if (!loadNextImage(images, labels, img, target)) {
+        return 1;
       }
-      putchar('\n');
+      matrixScale(img, 1.0f / 255.0f, img);
+
+      layer1->forward(layer1, img);
+      rms1->forward(rms1, layer1->output);
+      layer2->forward(layer2, rms1->output);
+      rms2->forward(rms2, layer2->output);
+      layer3->forward(layer3, rms2->output);
+      softmax->forward(softmax, layer3->output);
+
+      totalLoss += crossEntropy(target, softmax->output);
+
+      crossEntropyDeriv(target, softmax->output, loss);
+      layer3->backward(layer3, rms2->output, loss);
+      rms2->backward(rms2, layer2->output, layer3->loss);
+      layer2->backward(layer2, rms1->output, rms2->loss);
+      rms1->backward(rms1, layer1->output, layer2->loss);
+      layer1->backward(layer1, img, rms1->loss);
     }
+
+    float avgLoss = totalLoss / BATCHSIZE;
+
+    if ((i + 1) % 100 == 0) {
+      printf("%d/%d\nLoss: %f\n", (i + 1), outerLoop, avgLoss);
+      displayMatrix("Prediction", softmax->output);
+    }
+
+    if (avgLoss < 0.01f) {
+      printf("\rLoss: %f\n", avgLoss);
+      break;
+    }
+
+    layer1->optimize(layer1, BATCHSIZE, 0.1f, 0.1f);
+    layer2->optimize(layer2, BATCHSIZE, 0.1f, 0.1f);
+    layer3->optimize(layer2, BATCHSIZE, 0.1f, 0.1f);
   }
 
+  fclose(images);
+  fclose(labels);
+
+  return 0;
+
+  initIDXFile("./TrainingData/t10k-images-idx3-ubyte.bin", &images, &imgDim);
+  initIDXFile("./TrainingData/t10k-labels-idx1-ubyte.bin", &labels, &lblDim);
+
+  float totalLoss = 0.0f;
+  for (int i = 0; i < imgDim.x; i++) {
+    loadNextImage(images, labels, img, target);
+    matrixScale(img, 1.0f / 255.0f, img);
+
+    layer1->forward(layer1, img);
+    rms1->forward(rms1, layer1->output);
+    layer2->forward(layer2, rms1->output);
+    rms2->forward(rms2, layer2->output);
+    layer3->forward(layer3, rms2->output);
+    softmax->forward(softmax, layer3->output);
+
+    float loss = crossEntropy(target, softmax->output);
+    totalLoss += loss;
+
+    if (i % 500 == 0) {
+      printf("Loss: %.2f\n", loss);
+      displayMatrixf("Target", "%3.2f ", target);
+      displayMatrixf("Label", "%3.2f ", softmax->output);
+      displayMatrixf("Image", "%3.0f", img);
+    }
+  }
+  printf("\rAvg Loss: %.2f\n", totalLoss / imgDim.x);
+
+  deleteMatrix(img);
+  deleteMatrix(target);
+  deleteMatrix(loss);
+  deleteLinearLayer(layer1);
+  deleteActivationLayer(rms1);
+  deleteLinearLayer(layer2);
+  deleteActivationLayer(rms2);
+  deleteLinearLayer(layer3);
+  deleteActivationLayer(softmax);
   fclose(images);
   fclose(labels);
   return 0;
 }
 
-int main(void) {
-  nnDemultiplexer();
-  return 0;
-}
+int main(void) { return nnMNISTImageClassifier(); }
