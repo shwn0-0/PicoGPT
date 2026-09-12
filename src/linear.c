@@ -12,7 +12,7 @@ void nnLinearLayerForward(NNLinearLayer *layer, Matrix *input) {
 }
 
 void nnLinearLayerBackward(NNLinearLayer *layer, Matrix *input, Matrix *loss) {
-  Matrix *dzDW = newMatrix(layer->weights->dim);
+  Matrix *dzDW = newMatrix(layer->weightsGrad->dim);
 
   for (int i = 0; i < dzDW->dim.z; i++)
     for (size_t j = 0; j < dzDW->dim.w; j++) {
@@ -30,17 +30,18 @@ void nnLinearLayerBackward(NNLinearLayer *layer, Matrix *input, Matrix *loss) {
         }
     }
 
-  for (size_t r = 0; r < layer->weights->dim.z; r++)
-    for (size_t c = 0; c < layer->weights->dim.w; c++) {
+  for (size_t r = 0; r < layer->weights->dim.x; r++)
+    for (size_t c = 0; c < layer->weights->dim.y; c++) {
       float total = 0.0;
-      float in = getMatrixValue(input, (Vec4){0, 0, r, c});
-      for (size_t i = 0; i < layer->weights->dim.x; i++) {
-        for (size_t j = 0; j < layer->weights->dim.y; j++) {
-          total += getMatrixValue(layer->weights, (Vec4){i, j, r, c}) *
+      float in = getMatrixValue(input, (Vec4){0, 0, c, r});
+
+      for (size_t i = 0; i < layer->weights->dim.z; i++) {
+        for (size_t j = 0; j < layer->weights->dim.w; j++) {
+          total += getMatrixValue(layer->weights, (Vec4){r, c, i, j}) *
                    getMatrixValue(loss, (Vec4){0, 0, i, j}) * in;
         }
       }
-      setMatrixValue(layer->loss, (Vec4){0, 0, r, c}, total);
+      setMatrixValue(layer->loss, (Vec4){0, 0, c, r}, total);
     }
 
   matrixAdd(dzDW, layer->weightsGrad, layer->weightsGrad);
@@ -78,15 +79,15 @@ void nnLinearLayerOptimize(NNLinearLayer *layer, float steps, float lr,
   deleteMatrix(dW);
 }
 
-NNLinearLayer *newLinearLayer(int inputDim, int embeddingDim, int outputDim) {
+NNLinearLayer *newLinearLayer(Vec2 inputDim, Vec2 outputDim) {
   NNLinearLayer *layer = malloc(sizeof(NNLinearLayer));
 
   if (layer == NULL)
     return NULL;
 
-  MatrixDim weightsDim = {inputDim, embeddingDim, embeddingDim, outputDim};
-  MatrixDim biasDim = {1, 1, embeddingDim, outputDim};
-  MatrixDim lossDim = {1, 1, embeddingDim, inputDim};
+  Vec4 weightsDim = {inputDim.y, inputDim.x, outputDim.x, outputDim.y};
+  Vec4 biasDim = {1, 1, outputDim.x, outputDim.y};
+  Vec4 lossDim = {1, 1, inputDim.x, inputDim.y};
 
   *layer = (NNLinearLayer){
       .weights = newMatrix(weightsDim),

@@ -3,7 +3,6 @@
 
 #include "matrix.h"
 
-
 typedef struct NNLinearLayer {
   Matrix *weights;
   Matrix *weightsGrad;
@@ -19,7 +18,7 @@ typedef struct NNLinearLayer {
                                  float learningRate, float decay);
 } NNLinearLayer;
 
-NNLinearLayer *newLinearLayer(int inputDim, int embeddingDim, int outputDim);
+NNLinearLayer *newLinearLayer(Vec2 inputDim, Vec2 outputDim);
 void initLinearLayer(NNLinearLayer *nnLayer, float min, float max);
 void destroyLinearLayer(NNLinearLayer *layer);
 #endif

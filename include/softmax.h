@@ -2,6 +2,5 @@
 #define SOFTMAX_H
 #include "activation.h"
 
-NNActivationLayer * newSoftmaxActivationLayer(size_t inputDim,
-                                             size_t embeddingDim);
+NNActivationLayer * newSoftmaxActivationLayer(Vec2 inputDim);
 #endif

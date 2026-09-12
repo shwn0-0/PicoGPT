@@ -2,11 +2,11 @@
 #include <math.h>
 
 size_t matrixSize(const Matrix *m) {
-  MatrixDim dim = m->dim;
+  Vec4 dim = m->dim;
   return dim.x * dim.y * dim.z * dim.w;
 }
 
-Matrix *newMatrix(MatrixDim dim) {
+Matrix *newMatrix(Vec4 dim) {
   Matrix *m = malloc(sizeof(Matrix));
 
   if (m == NULL)
@@ -167,7 +167,7 @@ float matrixSum(const Matrix *in) {
 
 void displayMatrix(const char *title, const Matrix *m) {
   printf("%s:\n", title);
-  MatrixDim dim = m->dim;
+  Vec4 dim = m->dim;
 
   for (size_t l = 0; l < dim.x; l++) {
     for (size_t i = 0; i < dim.y; i++) {

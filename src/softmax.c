@@ -50,9 +50,8 @@ void softmaxDeriv(NNActivationLayer *layer, const Matrix *in,
   }
 }
 
-NNActivationLayer *newSoftmaxActivationLayer(size_t inputDim,
-                                             size_t embeddingDim) {
-  MatrixDim dim = {1, 1, embeddingDim, inputDim};
+NNActivationLayer *newSoftmaxActivationLayer(Vec2 inputDim) {
+  Vec4 dim = {1, 1, inputDim.x, inputDim.y};
   NNActivationLayer *layer = malloc(sizeof(NNActivationLayer));
   *layer = (NNActivationLayer){
       .forward = softmax,

@@ -4,19 +4,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct Vec3 {
+typedef struct {
+  size_t x;
+  size_t y;
+} Vec2;
+
+typedef struct {
   size_t x;
   size_t y;
   size_t z;
   size_t w;
-} MatrixDim, Vec4;
+} Vec4;
 
 typedef struct Matrix {
-  MatrixDim dim;
+  Vec4 dim;
   float *data;
 } Matrix;
 
-Matrix *newMatrix(MatrixDim dim);
+Matrix *newMatrix(Vec4 dim);
 void deleteMatrix(Matrix *m);
 
 void setMatrixValue(Matrix *m, Vec4 idx, float val);

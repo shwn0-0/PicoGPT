@@ -39,7 +39,8 @@ bool crossEntropyDeriv(const Matrix *target, const Matrix *prediction,
     float y = target->data[i];
     float y_hat = prediction->data[i];
     // out->data[i] = -(y / (y_hat + EPS));
-    out->data[i] = y_hat - y; // TODO: This is the derivative assuming softmax
+    // TODO: This is the derivative assuming softmax
+    out->data[i] = y_hat - y;
   }
 
   return true;
@@ -65,20 +66,20 @@ int nnDemultiplexer() {
   Matrix *loss = newMatrix((Vec4){.x = 1, .y = 1, .z = 1, .w = 8});
 
   if (!input || !target || !loss) {
-    return -1;
+    return 2;
   }
 
-  NNLinearLayer *linearLayer1 = newLinearLayer(3, 1, 8);
-  initLinearLayer(linearLayer1, -1.0, 1.0);
-  NNActivationLayer *activLayer1 = newSoftmaxActivationLayer(8, 1);
+  NNLinearLayer *linearLayer1 = newLinearLayer((Vec2){1, 3}, (Vec2){1, 8});
+  initLinearLayer(linearLayer1, -0.5, 0.5);
+  NNActivationLayer *activLayer1 = newSoftmaxActivationLayer((Vec2){1, 8});
 
-  NNLinearLayer *linearLayer2 = newLinearLayer(8, 1, 8);
-  initLinearLayer(linearLayer2, -1.0, 1.0);
-  NNActivationLayer *activLayer2 = newSoftmaxActivationLayer(8, 1);
+  NNLinearLayer *linearLayer2 = newLinearLayer((Vec2){1, 8}, (Vec2){1, 8});
+  initLinearLayer(linearLayer2, -0.5, 0.5);
+  NNActivationLayer *activLayer2 = newSoftmaxActivationLayer((Vec2){1, 8});
 
-  NNLinearLayer *linearLayer3 = newLinearLayer(8, 1, 8);
-  initLinearLayer(linearLayer3, -1.0, 1.0);
-  NNActivationLayer *activLayer3 = newSoftmaxActivationLayer(8, 1);
+  NNLinearLayer *linearLayer3 = newLinearLayer((Vec2){1, 8}, (Vec2){1, 8});
+  initLinearLayer(linearLayer3, -0.5, -0.5);
+  NNActivationLayer *activLayer3 = newSoftmaxActivationLayer((Vec2){1, 8});
 
   for (size_t i = 0; i < 100000; i++) {
     float lossTotal = 0.0;
@@ -111,7 +112,7 @@ int nnDemultiplexer() {
 
     float avg_loss = lossTotal / 8.0f;
 
-    if (avg_loss < 0.0001) {
+    if (avg_loss < 0.001) {
       printf("Loss: %f\n", avg_loss);
       break;
     }
@@ -153,15 +154,15 @@ int nnDemultiplexer() {
   deleteMatrix(target);
   deleteMatrix(loss);
   destroyLinearLayer(linearLayer1);
-  destroyLinearLayer(linearLayer2);
-  destroyLinearLayer(linearLayer3);
+  // destroyLinearLayer(linearLayer2);
+  // destroyLinearLayer(linearLayer3);
   deleteActivationLayer(activLayer1);
-  deleteActivationLayer(activLayer2);
-  deleteActivationLayer(activLayer3);
+  // deleteActivationLayer(activLayer2);
+  // deleteActivationLayer(activLayer3);
   return 0;
 }
 
-void initIDXFile(const char *path, FILE **f, MatrixDim *dim) {
+void initIDXFile(const char *path, FILE **f, Vec4 *dim) {
   if ((*f = fopen(path, "rb")) == NULL) {
     fprintf(stderr, "[FATAL] Error opening file %s\n", path);
     exit(1);
@@ -182,7 +183,7 @@ void initIDXFile(const char *path, FILE **f, MatrixDim *dim) {
   }
 }
 
-size_t nextIDXValue(FILE *f, MatrixDim dim, uint8_t *out) {
+size_t nextIDXValue(FILE *f, Vec4 dim, uint8_t *out) {
   size_t size = dim.y * dim.z * dim.w;
   size_t read = fread(out, sizeof(uint8_t), size, f);
   return size == read;
@@ -190,8 +191,8 @@ size_t nextIDXValue(FILE *f, MatrixDim dim, uint8_t *out) {
 
 int nnMNISTImageClassifier() {
   FILE *images, *labels;
-  MatrixDim imgDim;
-  MatrixDim lblDim;
+  Vec4 imgDim;
+  Vec4 lblDim;
 
   initIDXFile("./TrainingData/train-images-idx3-ubyte.bin", &images, &imgDim);
   initIDXFile("./TrainingData/train-labels-idx1-ubyte.bin", &labels, &lblDim);
